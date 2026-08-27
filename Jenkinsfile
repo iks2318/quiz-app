@@ -78,13 +78,16 @@ pipeline {
                     )
 
                     echo src directory found successfully.
+
+                    echo.
+                    echo Workspace check completed successfully.
                 '''
             }
         }
 
 
         // ============================================================
-        // 3. BUILD
+        // 3. BUILD BACKEND
         // ============================================================
 
         stage('Build Backend') {
@@ -101,7 +104,10 @@ pipeline {
                     set "PATH=%JAVA_HOME%\\bin;%PATH%"
 
                     echo.
+                    echo ==========================================
                     echo JAVA VERSION
+                    echo ==========================================
+
                     java -version
 
                     if errorlevel 1 (
@@ -110,7 +116,10 @@ pipeline {
                     )
 
                     echo.
+                    echo ==========================================
                     echo MAVEN VERSION
+                    echo ==========================================
+
                     mvn -version
 
                     if errorlevel 1 (
@@ -120,34 +129,37 @@ pipeline {
 
                     echo.
                     echo ==========================================
-                    echo MAVEN BUILD
+                    echo STARTING MAVEN BUILD
                     echo ==========================================
 
                     call mvn -B clean package -DskipTests
 
                     if errorlevel 1 (
                         echo.
-                        echo ERROR: Maven build failed.
+                        echo ==========================================
+                        echo MAVEN BUILD FAILED
+                        echo ==========================================
                         exit /b 1
                     )
 
                     echo.
                     echo ==========================================
-                    echo BUILD SUCCESSFUL
+                    echo MAVEN BUILD SUCCESSFUL
                     echo ==========================================
 
                     echo.
-                    echo TARGET CONTENTS:
+                    echo TARGET DIRECTORY:
                     dir target
 
                     echo.
                     echo Checking quizapp.jar...
 
                     if not exist "target\\quizapp.jar" (
-                        echo ERROR: target\\quizapp.jar not found.
+                        echo ERROR: target\\quizapp.jar was not generated.
                         exit /b 1
                     )
 
+                    echo.
                     echo quizapp.jar found successfully.
                 '''
             }
@@ -176,7 +188,9 @@ pipeline {
                     )
 
                     echo.
-                    echo TESTS COMPLETED SUCCESSFULLY.
+                    echo ==========================================
+                    echo TESTS COMPLETED SUCCESSFULLY
+                    echo ==========================================
                 '''
             }
         }
@@ -223,6 +237,11 @@ pipeline {
                     )
 
                     echo.
+                    echo Waiting for port 8090 to become free...
+
+                    ping -n 4 127.0.0.1 >nul
+
+                    echo.
                     echo Port 8090 is ready.
                 '''
             }
@@ -254,15 +273,25 @@ pipeline {
                     )
 
                     echo.
-                    echo Starting Spring Boot on port 8090...
+                    echo Starting Spring Boot application...
+
+                    echo.
+                    echo JAR:
+                    echo %WORKSPACE%\\target\\quizapp.jar
+
+                    echo.
+                    echo PORT:
+                    echo 8090
 
                     powershell -NoProfile -Command "$env:JENKINS_NODE_COOKIE='dontKillMe'; Start-Process -FilePath '%JAVA_HOME%\\bin\\java.exe' -ArgumentList '-jar','%WORKSPACE%\\target\\quizapp.jar','--server.port=8090' -RedirectStandardOutput '%WORKSPACE%\\backend.log' -RedirectStandardError '%WORKSPACE%\\backend-err.log' -WindowStyle Hidden"
 
                     echo.
-                    echo Backend start command executed.
+                    echo ==========================================
+                    echo BACKEND START COMMAND EXECUTED
+                    echo ==========================================
 
                     echo.
-                    echo Waiting for backend...
+                    echo Waiting for Spring Boot...
 
                     ping -n 11 127.0.0.1 >nul
 
@@ -298,7 +327,7 @@ pipeline {
 
 
         // ============================================================
-        // 8. HEALTH CHECK
+        // 8. BACKEND HEALTH CHECK
         // ============================================================
 
         stage('Backend Health Check') {
@@ -311,15 +340,24 @@ pipeline {
                     echo BACKEND HEALTH CHECK
                     echo ==========================================
 
-                    echo Backend:
+                    echo Backend URL:
                     echo http://localhost:8090
 
                     echo.
-                    echo Checking port 8090...
+                    echo Backend API:
+                    echo http://localhost:8090/api/user/quizzes
+
+                    echo.
+                    echo ==========================================
+                    echo WAITING FOR BACKEND
+                    echo ==========================================
 
                     set RETRIES=30
 
                     :CHECK_BACKEND
+
+                    echo.
+                    echo Attempts remaining: %RETRIES%
 
                     netstat -ano | findstr LISTENING | findstr ":8090" >nul
 
@@ -339,7 +377,7 @@ pipeline {
 
                         echo.
                         echo.
-                        echo Backend is running successfully.
+                        echo Backend application is running successfully.
 
                         exit /b 0
                     )
@@ -361,7 +399,9 @@ pipeline {
                         netstat -ano | findstr ":8090"
 
                         echo.
-                        echo BACKEND LOG:
+                        echo ==========================================
+                        echo BACKEND LOG
+                        echo ==========================================
 
                         if exist "%WORKSPACE%\\backend.log" (
                             type "%WORKSPACE%\\backend.log"
@@ -370,10 +410,14 @@ pipeline {
                         )
 
                         echo.
-                        echo BACKEND ERROR LOG:
+                        echo ==========================================
+                        echo BACKEND ERROR LOG
+                        echo ==========================================
 
                         if exist "%WORKSPACE%\\backend-err.log" (
                             type "%WORKSPACE%\\backend-err.log"
+                        ) else (
+                            echo backend-err.log not found.
                         )
 
                         exit /b 1
@@ -399,7 +443,7 @@ pipeline {
         success {
 
             echo '=========================================='
-            echo 'QUIZAPP BACKEND DEPLOYMENT SUCCESSFUL'
+            echo 'QUIZAPP DEPLOYMENT SUCCESSFUL'
             echo '=========================================='
 
             echo 'Backend:'
@@ -414,10 +458,10 @@ pipeline {
         failure {
 
             echo '=========================================='
-            echo 'QUIZAPP BACKEND DEPLOYMENT FAILED'
+            echo 'QUIZAPP DEPLOYMENT FAILED'
             echo '=========================================='
 
-            echo 'Check the failed Jenkins stage.'
+            echo 'Check the failed stage.'
             echo 'Check backend.log.'
             echo 'Check backend-err.log.'
 
