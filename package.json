@@ -1,0 +1,22 @@
+{
+  "name": "quiz-app",
+  "version": "1.0.0",
+  "description": "A complete, production-structured **Spring Boot + MySQL** backend for a quiz application. It exposes clean REST/JSON APIs meant to be consumed by a separately-built frontend (e.g. an **Appzillion** app) — this repository contains **backend code only**, no UI.",
+  "main": "index.js",
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iks2318/quiz-app.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/iks2318/quiz-app/issues"
+  },
+  "homepage": "https://github.com/iks2318/quiz-app#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.4.0"
+  }
+}

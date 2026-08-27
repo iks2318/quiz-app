@@ -16,8 +16,16 @@ pipeline {
 
         APP_JAR = 'target/quizapp.jar'
         BACKEND_PORT = '8090'
-        BACKEND_URL = 'http://localhost:8090/api/user/quizzes'
+        BACKEND_URL = 'http://localhost:8090/api/categories'
+
+        // ============================================================
+        // APPZILLON UI
+        // ============================================================
+
+        FRONTEND_PORT = '8111'
+        FRONTEND_URL = 'http://localhost:8111/quizapp/'
     }
+
 
     stages {
 
@@ -26,10 +34,11 @@ pipeline {
         // ============================================================
 
         stage('Checkout') {
+
             steps {
 
                 echo '=========================================='
-                echo 'CHECKING OUT QUIZ APP'
+                echo 'CHECKING OUT QUIZ APPLICATION'
                 echo '=========================================='
 
                 git branch: 'main',
@@ -43,13 +52,14 @@ pipeline {
         // ============================================================
 
         stage('Check Workspace') {
+
             steps {
 
                 bat '''
                     @echo off
 
                     echo ==========================================
-                    echo CHECKING JENKINS WORKSPACE
+                    echo WORKSPACE CHECK
                     echo ==========================================
 
                     echo Workspace:
@@ -80,33 +90,29 @@ pipeline {
                     echo src directory found successfully.
 
                     echo.
-                    echo Workspace check completed successfully.
+                    echo Workspace check completed.
                 '''
             }
         }
 
 
         // ============================================================
-        // 3. BUILD BACKEND
+        // 3. CHECK JAVA AND MAVEN
         // ============================================================
 
-        stage('Build Backend') {
+        stage('Check Java and Maven') {
+
             steps {
 
                 bat '''
                     @echo off
 
                     echo ==========================================
-                    echo BUILDING QUIZAPP BACKEND
+                    echo JAVA VERSION
                     echo ==========================================
 
                     set "JAVA_HOME=C:\\Program Files\\Java\\jdk-17.0.2"
                     set "PATH=%JAVA_HOME%\\bin;%PATH%"
-
-                    echo.
-                    echo ==========================================
-                    echo JAVA VERSION
-                    echo ==========================================
 
                     java -version
 
@@ -128,9 +134,32 @@ pipeline {
                     )
 
                     echo.
+                    echo Java and Maven are working successfully.
+                '''
+            }
+        }
+
+
+        // ============================================================
+        // 4. BUILD BACKEND
+        // ============================================================
+
+        stage('Build Backend') {
+
+            steps {
+
+                bat '''
+                    @echo off
+
                     echo ==========================================
-                    echo STARTING MAVEN BUILD
+                    echo BUILDING QUIZAPP BACKEND
                     echo ==========================================
+
+                    set "JAVA_HOME=C:\\Program Files\\Java\\jdk-17.0.2"
+                    set "PATH=%JAVA_HOME%\\bin;%PATH%"
+
+                    echo.
+                    echo Starting Maven build...
 
                     call mvn -B clean package -DskipTests
 
@@ -148,11 +177,12 @@ pipeline {
                     echo ==========================================
 
                     echo.
-                    echo TARGET DIRECTORY:
+                    echo Target directory:
+
                     dir target
 
                     echo.
-                    echo Checking quizapp.jar...
+                    echo Checking JAR...
 
                     if not exist "target\\quizapp.jar" (
                         echo ERROR: target\\quizapp.jar was not generated.
@@ -167,53 +197,11 @@ pipeline {
 
 
         // ============================================================
-        // 4. TEST
-        // ============================================================
-
-        stage('Test') {
-            steps {
-
-                bat '''
-                    @echo off
-
-                    echo ==========================================
-                    echo RUNNING TESTS
-                    echo ==========================================
-
-                    call mvn -B test
-
-                    if errorlevel 1 (
-                        echo ERROR: Tests failed.
-                        exit /b 1
-                    )
-
-                    echo.
-                    echo ==========================================
-                    echo TESTS COMPLETED SUCCESSFULLY
-                    echo ==========================================
-                '''
-            }
-        }
-
-
-        // ============================================================
-        // 5. ARCHIVE JAR
-        // ============================================================
-
-        stage('Archive JAR') {
-            steps {
-
-                archiveArtifacts artifacts: 'target/*.jar',
-                    fingerprint: true
-            }
-        }
-
-
-        // ============================================================
-        // 6. STOP OLD BACKEND
+        // 5. STOP OLD BACKEND ON 8090
         // ============================================================
 
         stage('Stop Old Backend') {
+
             steps {
 
                 bat '''
@@ -237,22 +225,23 @@ pipeline {
                     )
 
                     echo.
-                    echo Waiting for port 8090 to become free...
+                    echo Waiting for port 8090...
 
                     ping -n 4 127.0.0.1 >nul
 
                     echo.
-                    echo Port 8090 is ready.
+                    echo Port 8090 cleanup completed.
                 '''
             }
         }
 
 
         // ============================================================
-        // 7. START BACKEND
+        // 6. START SPRING BOOT ON 8090
         // ============================================================
 
         stage('Start Backend') {
+
             steps {
 
                 bat '''
@@ -263,6 +252,7 @@ pipeline {
                     echo ==========================================
 
                     set "JAVA_HOME=C:\\Program Files\\Java\\jdk-17.0.2"
+                    set "PATH=%JAVA_HOME%\\bin;%PATH%"
 
                     if exist "%WORKSPACE%\\backend.log" (
                         del /F /Q "%WORKSPACE%\\backend.log"
@@ -273,9 +263,6 @@ pipeline {
                     )
 
                     echo.
-                    echo Starting Spring Boot application...
-
-                    echo.
                     echo JAR:
                     echo %WORKSPACE%\\target\\quizapp.jar
 
@@ -283,12 +270,13 @@ pipeline {
                     echo PORT:
                     echo 8090
 
+                    echo.
+                    echo Starting Spring Boot...
+
                     powershell -NoProfile -Command "$env:JENKINS_NODE_COOKIE='dontKillMe'; Start-Process -FilePath '%JAVA_HOME%\\bin\\java.exe' -ArgumentList '-jar','%WORKSPACE%\\target\\quizapp.jar','--server.port=8090' -RedirectStandardOutput '%WORKSPACE%\\backend.log' -RedirectStandardError '%WORKSPACE%\\backend-err.log' -WindowStyle Hidden"
 
                     echo.
-                    echo ==========================================
-                    echo BACKEND START COMMAND EXECUTED
-                    echo ==========================================
+                    echo Backend start command executed.
 
                     echo.
                     echo Waiting for Spring Boot...
@@ -313,13 +301,15 @@ pipeline {
                         echo backend.log not found.
                     )
 
-                    if exist "%WORKSPACE%\\backend-err.log" (
-                        echo.
-                        echo ==========================================
-                        echo BACKEND ERROR LOG
-                        echo ==========================================
+                    echo.
+                    echo ==========================================
+                    echo BACKEND ERROR LOG
+                    echo ==========================================
 
+                    if exist "%WORKSPACE%\\backend-err.log" (
                         powershell -NoProfile -Command "Get-Content '%WORKSPACE%\\backend-err.log' -Tail 100"
+                    ) else (
+                        echo backend-err.log not found.
                     )
                 '''
             }
@@ -327,10 +317,11 @@ pipeline {
 
 
         // ============================================================
-        // 8. BACKEND HEALTH CHECK
+        // 7. BACKEND HEALTH CHECK
         // ============================================================
 
         stage('Backend Health Check') {
+
             steps {
 
                 bat '''
@@ -340,17 +331,12 @@ pipeline {
                     echo BACKEND HEALTH CHECK
                     echo ==========================================
 
-                    echo Backend URL:
+                    echo Backend:
                     echo http://localhost:8090
 
                     echo.
-                    echo Backend API:
-                    echo http://localhost:8090/api/user/quizzes
-
-                    echo.
-                    echo ==========================================
-                    echo WAITING FOR BACKEND
-                    echo ==========================================
+                    echo API:
+                    echo http://localhost:8090/api/categories
 
                     set RETRIES=30
 
@@ -358,6 +344,10 @@ pipeline {
 
                     echo.
                     echo Attempts remaining: %RETRIES%
+
+                    curl -s -o nul -w "HTTP Status: %%{http_code}" "http://localhost:8090/api/categories"
+
+                    echo.
 
                     netstat -ano | findstr LISTENING | findstr ":8090" >nul
 
@@ -370,18 +360,10 @@ pipeline {
 
                         echo Port 8090 is listening.
 
-                        echo.
-                        echo Testing API...
-
-                        curl -s -o nul -w "HTTP Status: %%{http_code}" "http://localhost:8090/api/user/quizzes"
-
-                        echo.
-                        echo.
-                        echo Backend application is running successfully.
-
                         exit /b 0
                     )
 
+                    echo.
                     echo Backend is not ready yet.
 
                     set /a RETRIES-=1
@@ -431,26 +413,189 @@ pipeline {
                 '''
             }
         }
+
+
+        // ============================================================
+        // 8. CHECK APPZILLON UI
+        // ============================================================
+
+        stage('Check Appzillon UI') {
+
+            steps {
+
+                bat '''
+                    @echo off
+
+                    echo ==========================================
+                    echo CHECKING APPZILLON UI
+                    echo ==========================================
+
+                    echo.
+                    echo Appzillon URL:
+                    echo http://localhost:8111/quizapp/
+
+                    echo.
+                    echo Checking port 8111...
+
+                    netstat -ano | findstr LISTENING | findstr ":8111"
+
+                    if errorlevel 1 (
+
+                        echo.
+                        echo ==========================================
+                        echo ERROR: APPZILLON IS NOT RUNNING
+                        echo ==========================================
+
+                        echo Port 8111 is not listening.
+
+                        echo.
+                        echo Start your Appzillon application on:
+
+                        echo http://localhost:8111/quizapp/
+
+                        exit /b 1
+                    )
+
+                    echo.
+                    echo Port 8111 is listening.
+
+                    echo.
+                    echo Testing Appzillon URL...
+
+                    curl -I -s "http://localhost:8111/quizapp/"
+
+                    if errorlevel 1 (
+
+                        echo.
+                        echo ERROR: Appzillon UI could not be reached.
+                        exit /b 1
+                    )
+
+                    echo.
+                    echo ==========================================
+                    echo APPZILLON UI IS AVAILABLE
+                    echo ==========================================
+                '''
+            }
+        }
+
+
+        // ============================================================
+        // 9. INSTALL PLAYWRIGHT CHROMIUM
+        // ============================================================
+
+        stage('Install Playwright Browser') {
+
+            steps {
+
+                bat '''
+                    @echo off
+
+                    echo ==========================================
+                    echo INSTALLING PLAYWRIGHT CHROMIUM
+                    echo ==========================================
+
+                    set "JAVA_HOME=C:\\Program Files\\Java\\jdk-17.0.2"
+                    set "PATH=%JAVA_HOME%\\bin;%PATH%"
+
+                    call mvn -B -Dexec.classpathScope=test -Dexec.mainClass=com.microsoft.playwright.CLI -Dexec.args="install chromium" org.codehaus.mojo:exec-maven-plugin:3.5.0:java
+
+                    if errorlevel 1 (
+                        echo.
+                        echo ERROR: Playwright Chromium installation failed.
+                        exit /b 1
+                    )
+
+                    echo.
+                    echo Playwright Chromium installed successfully.
+                '''
+            }
+        }
+
+
+        // ============================================================
+        // 10. RUN PLAYWRIGHT TEST
+        // ============================================================
+
+        stage('Run Playwright Tests') {
+
+            steps {
+
+                bat '''
+                    @echo off
+
+                    echo ==========================================
+                    echo RUNNING PLAYWRIGHT TESTS
+                    echo ==========================================
+
+                    set "JAVA_HOME=C:\\Program Files\\Java\\jdk-17.0.2"
+                    set "PATH=%JAVA_HOME%\\bin;%PATH%"
+
+                    echo.
+                    echo Appzillon UI:
+                    echo http://localhost:8111/quizapp/
+
+                    echo.
+                    echo Backend:
+                    echo http://localhost:8090
+
+                    echo.
+                    echo Running Maven tests...
+
+                    call mvn -B test
+
+                    if errorlevel 1 (
+                        echo.
+                        echo ==========================================
+                        echo PLAYWRIGHT TEST FAILED
+                        echo ==========================================
+                        exit /b 1
+                    )
+
+                    echo.
+                    echo ==========================================
+                    echo PLAYWRIGHT TEST PASSED
+                    echo ==========================================
+                '''
+            }
+        }
+
+
+        // ============================================================
+        // 11. ARCHIVE JAR
+        // ============================================================
+
+        stage('Archive JAR') {
+
+            steps {
+
+                archiveArtifacts artifacts: 'target/*.jar',
+                    fingerprint: true
+            }
+        }
     }
 
 
-    // ============================================================
+    // ================================================================
     // POST ACTIONS
-    // ============================================================
+    // ================================================================
 
     post {
 
         success {
 
             echo '=========================================='
-            echo 'QUIZAPP DEPLOYMENT SUCCESSFUL'
+            echo 'QUIZAPP PIPELINE SUCCESSFUL'
             echo '=========================================='
 
             echo 'Backend:'
             echo 'http://localhost:8090'
 
             echo 'Quiz API:'
-            echo 'http://localhost:8090/api/user/quizzes'
+            echo 'http://localhost:8090/api/categories'
+
+            echo 'Appzillon UI:'
+            echo 'http://localhost:8111/quizapp/'
 
             echo '=========================================='
         }
@@ -458,12 +603,13 @@ pipeline {
         failure {
 
             echo '=========================================='
-            echo 'QUIZAPP DEPLOYMENT FAILED'
+            echo 'QUIZAPP PIPELINE FAILED'
             echo '=========================================='
 
-            echo 'Check the failed stage.'
+            echo 'Check the failed Jenkins stage.'
             echo 'Check backend.log.'
             echo 'Check backend-err.log.'
+            echo 'Check Playwright test output.'
 
             echo '=========================================='
         }
